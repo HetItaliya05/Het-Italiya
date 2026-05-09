@@ -1,5 +1,10 @@
 const jwt = require('jsonwebtoken');
-const jwtSecret = process.env.JWT_SECRET || 'dev_jwt_secret_change_me';
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  throw new Error('Missing required environment variable: JWT_SECRET');
+}
+
 
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;

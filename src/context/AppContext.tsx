@@ -3,7 +3,18 @@ import { User, GameHistoryEntry, Bet, Transaction } from '../types';
 import { createPeriodCode, generateRandomHistory } from '../utils/gameUtils';
 import { sounds } from '../utils/sound';
 
-const API_BASE = 'https://color-treading-vh9e.onrender.com/api';
+const API_BASE_RAW = import.meta.env.VITE_API_URL as string | undefined;
+const API_BASE = (API_BASE_RAW || '').replace(/\/$/, '');
+
+function mustGetApiBase() {
+  if (!API_BASE) {
+    // Avoid hard crashing in UI; fail fast with a readable log.
+    console.error('Missing VITE_API_URL. Set it to your Render backend base, e.g. https://<render-host>/api');
+    return '';
+  }
+  return API_BASE;
+}
+
 
 type AuthResult = { success: boolean; message?: string };
 
@@ -67,7 +78,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (!token) return;
 
-    fetch(`${API_BASE}/auth/me`, {
+    const base = mustGetApiBase();
+    fetch(`${base}/auth/me`, {
+
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (response) => {
@@ -199,7 +212,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const authenticate = async (endpoint: 'login' | 'register', phone: string, password: string): Promise<AuthResult> => {
     try {
-      const response = await fetch(`${API_BASE}/auth/${endpoint}`, {
+      const base = mustGetApiBase();
+      const response = await fetch(`${base}/auth/${endpoint}`, {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, password }),

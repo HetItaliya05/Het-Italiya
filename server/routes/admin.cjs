@@ -10,7 +10,12 @@ const GameControl = require('../models/GameControl.cjs');
 const { requireAuth, requireAdmin } = require('../middleware/auth.cjs');
 
 const router = express.Router();
-const jwtSecret = process.env.JWT_SECRET || 'dev_jwt_secret_change_me';
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  throw new Error('Missing required environment variable: JWT_SECRET');
+}
+
 
 const signAdminToken = (admin) => jwt.sign(
   { id: admin._id.toString(), role: 'admin', username: admin.username },

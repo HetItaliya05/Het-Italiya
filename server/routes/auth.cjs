@@ -5,7 +5,12 @@ const User = require('../models/User.cjs');
 const { requireAuth } = require('../middleware/auth.cjs');
 
 const router = express.Router();
-const jwtSecret = process.env.JWT_SECRET || 'dev_jwt_secret_change_me';
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  throw new Error('Missing required environment variable: JWT_SECRET');
+}
+
 
 const createUid = () => String(Math.floor(1000000 + Math.random() * 9000000));
 
