@@ -3,7 +3,7 @@ import { User, GameHistoryEntry, Bet, Transaction } from '../types';
 import { createPeriodCode, generateRandomHistory } from '../utils/gameUtils';
 import { sounds } from '../utils/sound';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'https://color-treading-vh9e.onrender.com/api';
 
 type AuthResult = { success: boolean; message?: string };
 
