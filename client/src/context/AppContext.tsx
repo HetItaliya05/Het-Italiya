@@ -3,24 +3,11 @@ import { User, GameHistoryEntry, Bet, Transaction } from '../types';
 import { createPeriodCode, generateRandomHistory } from '../utils/gameUtils';
 import { sounds } from '../utils/sound';
 
-const API_BASE_RAW = import.meta.env.VITE_API_URL as string | undefined;
 
-// VITE_API_URL can be either:
-// - full API prefix already (e.g. https://host/api)
-// - or backend host base (e.g. https://host)
-// We normalize to always produce `${origin}/api`.
-function getApiBase() {
-  const raw = (API_BASE_RAW || '').trim();
 
-  // Dev-friendly default (works with our Vite proxy for /api)
-  if (!raw) return '/api';
+import { apiFetch } from '../utils/api';
 
-  const noTrailing = raw.replace(/\/$/, '');
-  if (noTrailing.endsWith('/api')) return noTrailing;
-  return `${noTrailing}/api`;
-}
 
-const API_BASE = getApiBase();
 
 type AuthResult = { success: boolean; message?: string };
 
@@ -82,21 +69,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     const token = localStorage.getItem('daman_auth_token');
-
     if (!token) return;
 
-    const base = API_BASE;
-    fetch(`${base}/auth/me`, {
-
-
+    apiFetch<any>(`/auth/me`, {
+      method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Session expired');
-        return response.json();
-      })
-      .then((data) => {
-        if (data.user) setUser(data.user);
+      .then((result) => {
+        if (!result.ok) throw new Error('Session invalid');
+        if (result.data?.user) setUser(result.data.user);
       })
       .catch(() => {
         localStorage.removeItem('daman_auth_token');
@@ -219,34 +200,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentPeriod, user]);
 
   const authenticate = async (endpoint: 'login' | 'register', phone: string, password: string): Promise<AuthResult> => {
-    try {
-      const base = API_BASE;
-      const response = await fetch(`${base}/auth/${endpoint}`, {
+    const result = await apiFetch<any>(`/auth/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password }),
+    });
 
-
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        sounds.playError();
-        return { success: false, message: data.message || 'Authentication failed' };
-      }
-
-      localStorage.setItem('daman_auth_token', data.token);
-      setUser(data.user);
-      sounds.playSuccess();
-      return { success: true };
-    } catch (error) {
+    if (!result.ok) {
       sounds.playError();
-      return {
-        success: false,
-        message: 'Server not connected. Start Node API and MongoDB Compass, then try again.',
-      };
+      const msg =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message || 'Authentication failed';
+      return { success: false, message: msg };
     }
+
+    localStorage.setItem('daman_auth_token', result.data.token);
+    setUser(result.data.user);
+    sounds.playSuccess();
+    return { success: true };
   };
 
   const login = (phone: string, password: string) => authenticate('login', phone, password);
