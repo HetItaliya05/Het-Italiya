@@ -1,281 +1,114 @@
-// const express = require('express');
-// const mongoose = require('mongoose');
-// const cors = require('cors');
-// const path = require('path');
-// const authRoutes = require('./routes/auth.cjs');
-// const depositRoutes = require('./routes/deposit.cjs');
-// const adminRoutes = require('./routes/admin.cjs');
-
-// const app = express();
-// const port = process.env.PORT || 5000;
-// const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/';
-
-// app.use(cors({ origin: true, credentials: true }));
-// app.use(express.json());
-// app.get('/api/health', (_req, res) => res.json({ ok: true, mongoUri }));
-// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// app.use('/api/auth', authRoutes);
-// app.use('/api', depositRoutes);
-// app.use('/admin', adminRoutes);
-
-// app.use((error, _req, res, _next) => {
-//   console.error(error);
-//   res.status(500).json({ message: error.message || 'Internal server error' });
-// });
-
-// mongoose
-//   .connect(mongoUri)
-//   .then(() => {
-//     app.listen(port, () => console.log(`API server running on port ${port}`));
-//   })
-//   .catch((error) => {
-//     console.error('MongoDB connection failed', error);
-//     process.exit(1);
-// //   });
-// const PORT = process.env.PORT || 5000;
-
-// mongoose
-//   .connect(mongoUri)
-//   .then(() => {
-//     console.log("MongoDB Connected");
-
-//     app.listen(PORT, "0.0.0.0", () => {
-//       console.log(`Server running on port ${PORT}`);
-//     });
-//   })
-//   .catch((error) => {
-//     console.error("MongoDB connection failed:", error);
-//     process.exit(1);
-//   });
-// require("dotenv").config();
-
-// const express = require("express");
-// const mongoose = require("mongoose");
-// const cors = require("cors");
-// const path = require("path");
-
-// const authRoutes = require("./routes/auth.cjs");
-// const depositRoutes = require("./routes/deposit.cjs");
-// const adminRoutes = require("./routes/admin.cjs");
-
-// const app = express();
-
-// const PORT = process.env.PORT ? Number(process.env.PORT) : 5000;
-// const JWT_SECRET = process.env.JWT_SECRET;
-
-// // Support both env var names for backward compatibility.
-// const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
-// const corsOrigin = process.env.CORS_ORIGIN;
-
-// function assertEnv(name, value) {
-//   if (!value) {
-//     throw new Error(`Missing required environment variable: ${name}`);
-//   }
-// }
-
-// assertEnv("MONGODB_URI (or MONGO_URI)", mongoUri);
-// assertEnv("JWT_SECRET", JWT_SECRET);
-
-// app.use(
-//   cors({
-//     origin: corsOrigin
-//       ? corsOrigin
-//       : (origin, cb) => {
-//           // In production (Render/Vercel), origin will usually be https://<vercel-domain>
-//           // If origin header is missing (e.g. curl), allow it.
-//           if (!origin) return cb(null, true);
-//           return cb(null, true);
-//         },
-//     credentials: true,
-//   })
-// );
-// app.use(express.json({ limit: "1mb" }));
-
-// app.get("/api/health", (_req, res) => {
-//   res.json({
-//     ok: true,
-//     message: "Server running successfully",
-//   });
-// });
-
-// app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// app.use("/api/auth", authRoutes);
-// app.use("/api", depositRoutes);
-// app.use("/admin", adminRoutes);
-
-// // Error handling (production-safe)
-// app.use((error, _req, res, _next) => {
-//   console.error("[API Error]", error);
-
-//   if (res.headersSent) {
-//     return;
-//   }
-
-//   const status = Number(error.statusCode || error.status || 500);
-//   const message = error.message || "Internal server error";
-//   res.status(status).json({ message });
-// });
-
-// async function connectMongoWithRetry(uri, maxRetries = 10, delayMs = 5000) {
-//   let attempt = 0;
-//   while (attempt < maxRetries) {
-//     attempt += 1;
-//     try {
-//       console.log(`[MongoDB] Connecting (attempt ${attempt}/${maxRetries})...`);
-//       // Mongoose 9 defaults are generally fine; keep timeouts explicit.
-//       await mongoose.connect(uri, {
-//         serverSelectionTimeoutMS: 10000,
-//         socketTimeoutMS: 45000,
-//       });
-//       console.log("[MongoDB] Connected");
-//       return;
-//     } catch (err) {
-//       console.error("[MongoDB] Connection failed:", err?.message || err);
-//       if (attempt >= maxRetries) throw err;
-//       await new Promise((r) => setTimeout(r, delayMs));
-//     }
-//   }
-// }
-
-// connectMongoWithRetry(mongoUri)
-//   .then(() => {
-//     app.listen(PORT, () => {
-//       console.log(`[API] Server running on port ${PORT}`);
-//     });
-//   })
-//   .catch((error) => {
-//     // Do not silently crash without context.
-//     console.error("[MongoDB] Fatal: could not connect after retries. Not starting API.", error);
-//   });
-
-
+// Load env as early as possible
 require("dotenv").config();
 
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const path = require("path");
-
-const authRoutes = require("./routes/auth.cjs");
-const depositRoutes = require("./routes/deposit.cjs");
-const adminRoutes = require("./routes/admin.cjs");
 
 const app = express();
 
-// Environment Variables
-const PORT = process.env.PORT ? Number(process.env.PORT) : 5000;
-const JWT_SECRET = process.env.JWT_SECRET;
+// ====== Basic middleware ======
+app.use(express.json({ limit: "2mb" }));
 
-// Mongo URI support
-const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+// ====== CORS ======
+// Use an allowlist if CLIENT_ORIGIN is provided.
+// Example: CLIENT_ORIGIN="https://your-frontend.com,http://localhost:5173"
+// Notes:
+// - We must not use `*` with `credentials: true`.
+// - We allow requests without Origin header (curl/postman) always.
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN;
+const ENV = process.env.NODE_ENV || 'development';
 
-// Optional frontend URL
-const corsOrigin = process.env.CORS_ORIGIN;
+const corsOptions = {
+  credentials: true,
+  origin: (origin, callback) => {
+    // allow non-browser requests (like curl/postman)
+    if (!origin) return callback(null, true);
 
-// Validate Environment Variables
-function assertEnv(name, value) {
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-}
+    // If allowlist provided, enforce it.
+    if (CLIENT_ORIGIN) {
+      const allowed = CLIENT_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
+      if (allowed.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS blocked origin: ${origin}`));
+    }
 
-assertEnv("MONGO_URI", mongoUri);
-assertEnv("JWT_SECRET", JWT_SECRET);
+    // No allowlist: be permissive in dev, safe in prod.
+    const devAllowed = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+    ];
 
-// Middleware
+    if (ENV === 'development') {
+      if (devAllowed.includes(origin)) return callback(null, true);
+      // Still allow any other local dev origin.
+      return callback(null, true);
+    }
+
+    // Production fallback: allow only the listed dev origins unless allowlist is set.
+    if (devAllowed.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked origin (no CLIENT_ORIGIN allowlist set): ${origin}`));
+  },
+};
+
+app.use(cors(corsOptions));
+
+
+// ====== Routes ======
+// Keep existing folder structure, just mount them properly.
+const authRoutes = require("./routes/auth.cjs");
+const adminRoutes = require("./routes/admin.cjs");
+const depositRoutes = require("./routes/deposit.cjs");
+
+app.get("/health", (_req, res) => res.json({ ok: true }));
+
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api", depositRoutes);
+
+// Serve uploaded screenshots so frontend can access /uploads/... paths
+const path = require("path");
 app.use(
-  cors({
-    origin: corsOrigin || true,
-    credentials: true,
-  })
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"))
 );
 
-app.use(express.json({ limit: "1mb" }));
+// ====== Config ======
+const PORT = Number(process.env.PORT || 5000);
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
-// Health Check Route
-app.get("/api/health", (_req, res) => {
-  res.json({
-    ok: true,
-    message: "Server running successfully",
-  });
-});
-
-// Static Uploads
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api", depositRoutes);
-app.use("/admin", adminRoutes);
-
-// Error Handler
-app.use((error, _req, res, _next) => {
-  console.error("[API Error]", error);
-
-  if (res.headersSent) {
-    return;
-  }
-
-  const status = Number(error.statusCode || error.status || 500);
-
-  res.status(status).json({
-    message: error.message || "Internal server error",
-  });
-});
-
-// MongoDB Connection
-async function connectMongoWithRetry(
-  uri,
-  maxRetries = 10,
-  delayMs = 5000
-) {
-  let attempt = 0;
-
-  while (attempt < maxRetries) {
-    attempt += 1;
-
-    try {
-      console.log(
-        `[MongoDB] Connecting (${attempt}/${maxRetries})...`
-      );
-
-      await mongoose.connect(uri, {
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
-      });
-
-      console.log("[MongoDB] Connected");
-      return;
-    } catch (err) {
-      console.error(
-        "[MongoDB] Connection failed:",
-        err?.message || err
-      );
-
-      if (attempt >= maxRetries) {
-        throw err;
-      }
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, delayMs)
-      );
-    }
-  }
+if (!MONGODB_URI) {
+  console.error("❌ Missing MongoDB connection string. Set MONGODB_URI (preferred) or MONGO_URI.");
+  process.exit(1);
 }
 
-// Start Server
-connectMongoWithRetry(mongoUri)
+if (!process.env.JWT_SECRET) {
+  console.error("❌ Missing JWT_SECRET. Auth middleware will fail.");
+  process.exit(1);
+}
+
+// ====== Mongo connection ======
+// Use modern connection options and clear logs.
+mongoose
+  .connect(MONGODB_URI)
   .then(() => {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[API] Server running on port ${PORT}`);
+    console.log("MongoDB Connected ✅");
+
+    app.listen(PORT, () => {
+      console.log(`Server Running On ${PORT} 🚀`);
     });
   })
-  .catch((error) => {
-    console.error(
-      "[MongoDB] Fatal: could not connect after retries.",
-      error
-    );
-
+  .catch((err) => {
+    console.error("MongoDB connection error ❌", err);
     process.exit(1);
   });
+
+// Basic error handler (must be last)
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  console.error("Express error:", err);
+  res.status(err.statusCode || 500).json({
+    message: err.message || "Internal Server Error",
+  });
+});
