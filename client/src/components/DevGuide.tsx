@@ -210,7 +210,7 @@ export const DevGuide: React.FC = () => {
                 <p>{"  const [open, setOpen] = useState(false);"}</p>
                 <br />
                 <p>{"  useEffect(() => {"}</p>
-                <p>{"    const ws = new WebSocket('ws://localhost:5000');"}</p>
+<p>{"    const ws = new WebSocket('wss://het-italiya-1.onrender.com');"}</p>
                 <p>{"    ws.onmessage = (event) => {"}</p>
                 <p>{"      const data = JSON.parse(event.data);"}</p>
                 <p>{"      if (data.type === 'TICK') {"}</p>
