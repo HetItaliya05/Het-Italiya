@@ -5,7 +5,12 @@ import { sounds } from '../utils/sound';
 
 
 
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../utils/api.ts';
+
+
+
+
+
 
 
 
