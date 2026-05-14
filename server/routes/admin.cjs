@@ -31,25 +31,38 @@ router.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required' });
+    const cleanUsername = String(username ?? '').replace(/\D/g, '');
+    const plainPassword = String(password ?? '');
+
+    if (!cleanUsername || plainPassword.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username and password are required',
+      });
     }
 
-    const admin = await Admin.findOne({ username: String(username).toLowerCase().trim() });
-
+    const admin = await Admin.findOne({ username: cleanUsername });
     if (!admin) {
-      return res.status(401).json({ message: 'Invalid admin credentials' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin credentials',
+      });
     }
 
-    const passwordOk = await bcrypt.compare(password, admin.passwordHash);
-
+    const passwordOk = await bcrypt.compare(plainPassword, admin.passwordHash);
     if (!passwordOk) {
-      return res.status(401).json({ message: 'Invalid admin credentials' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin credentials',
+      });
     }
+
+    const token = signAdminToken(admin);
 
     return res.json({
-      token: signAdminToken(admin),
-      admin: { id: admin._id, username: admin.username, role: admin.role },
+      success: true,
+      token,
+      admin: true,
     });
   } catch (error) {
     next(error);

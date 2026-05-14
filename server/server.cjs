@@ -234,11 +234,13 @@ const authRoutes = require("./routes/auth.cjs");
 const adminRoutes = require("./routes/admin.cjs");
 const depositRoutes = require("./routes/deposit.cjs");
 const walletRoutes = require("./routes/wallet.cjs");
+const { ensureAdmin } = require('./scripts/ensureAdmin.cjs');
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", depositRoutes);
 app.use("/api/wallet", walletRoutes);
+
 
 
 // ================================
@@ -269,8 +271,12 @@ app.use((err, req, res, next) => {
 // ================================
 mongoose
   .connect(MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log("✅ MongoDB Connected");
+
+    // Ensure real admin user exists (idempotent)
+    await ensureAdmin();
+    console.log("✅ Admin ensureAdmin() completed");
 
     app.listen(PORT, () => {
       console.log(
