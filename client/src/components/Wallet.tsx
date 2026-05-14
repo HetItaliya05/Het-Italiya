@@ -168,7 +168,7 @@ export const Wallet: React.FC = () => {
             <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">Deposit Request</p>
             <h2 className="mt-2 text-2xl font-black text-white">Payment Submitted Successfully</h2>
             <p className="mt-2 text-sm font-semibold text-gray-400">
-              તમારો UPI payment submit થયો છે અને demo mode માં wallet balance update થઈ ગયું છે.
+              Your UPI payment has been submitted successfully.
             </p>
             <button
               onClick={() => setShowSuccess(false)}
