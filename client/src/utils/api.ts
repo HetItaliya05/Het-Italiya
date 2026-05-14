@@ -19,7 +19,9 @@ export const apiUrl = (path: string): string => {
   const normalized = path.startsWith('/') ? path : `/${path}`;
 
   // If VITE_API_URL isn't set, call same-origin at /api.
+  // (In production, you should always set VITE_API_URL.)
   if (!API_BASE) return `/api${normalized}`;
+
 
   // If caller already provided /api/..., keep it.
   if (normalized.startsWith('/api')) return `${API_BASE}${normalized}`;
@@ -35,6 +37,7 @@ export async function apiFetch<T>(
   try {
     const res = await fetch(apiUrl(path), {
       ...options,
+      credentials: 'include',
       headers: {
         ...(options.headers || {}),
         ...(options.body && !(options.headers as any)?.['Content-Type']
@@ -42,6 +45,7 @@ export async function apiFetch<T>(
           : {}),
       },
     });
+
 
     const status = res.status;
     const text = await res.text();
