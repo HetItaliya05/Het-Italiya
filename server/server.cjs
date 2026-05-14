@@ -19,36 +19,31 @@ app.use(express.json({ limit: "2mb" }));
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN;
 const ENV = process.env.NODE_ENV || 'development';
 
+const devOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+];
+
 const corsOptions = {
   credentials: true,
   origin: (origin, callback) => {
-    // allow non-browser requests (like curl/postman)
+    // Allow non-browser requests (curl, Postman, Render health checks)
     if (!origin) return callback(null, true);
 
-    // If allowlist provided, enforce it.
-    if (CLIENT_ORIGIN) {
-      const allowed = CLIENT_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
-      if (allowed.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS blocked origin: ${origin}`));
-    }
-
-    // No allowlist: be permissive in dev, safe in prod.
-    const devAllowed = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:3000',
+    // Build allowed list: explicit CLIENT_ORIGIN env var + dev origins
+    const allowed = [
+      ...(CLIENT_ORIGIN ? CLIENT_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean) : []),
+      ...devOrigins,
     ];
 
-    if (ENV === 'development') {
-      if (devAllowed.includes(origin)) return callback(null, true);
-      // Still allow any other local dev origin.
-      return callback(null, true);
-    }
+    if (allowed.includes(origin)) return callback(null, true);
 
-    // Production fallback: allow only the listed dev origins unless allowlist is set.
-    if (devAllowed.includes(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked origin (no CLIENT_ORIGIN allowlist set): ${origin}`));
+    // In development, allow everything for convenience
+    if (ENV === 'development') return callback(null, true);
+
+    return callback(new Error(`CORS blocked: ${origin}. Add it to CLIENT_ORIGIN env var on Render.`));
   },
 };
 
