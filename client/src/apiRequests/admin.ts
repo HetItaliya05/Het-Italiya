@@ -1,6 +1,4 @@
-import { apiFetch } from '../utils/api';
-
-const getToken = () => localStorage.getItem('daman_auth_token');
+ import { apiFetch } from '../utils/api';
 
 export const adminLoginRequest = async (usernameOrPhone: string, password: string) => {
   // NOTE: backend expects { username, password }.

@@ -45,7 +45,7 @@ const withdrawalsSeed: AdminWithdrawal[] = [
 const chartData = [34, 48, 38, 70, 58, 86, 74];
 
 export const AdminPanel: React.FC = () => {
-  const [token, setToken] = useState(() => localStorage.getItem('admin_token') || '');
+  const [token, setToken] = useState(() => localStorage.getItem('adminToken') || '');
   const [loginForm, setLoginForm] = useState({ username: 'admin', password: 'Admin@12345' });
   const [loginError, setLoginError] = useState('');
   const [section, setSection] = useState<AdminSection>('overview');
@@ -79,13 +79,11 @@ export const AdminPanel: React.FC = () => {
 
   const handleLogin = (event: React.FormEvent) => {
     event.preventDefault();
-    if (loginForm.username === 'admin' && loginForm.password === 'Admin@12345') {
-      localStorage.setItem('admin_token', 'demo-admin-jwt-token');
-      setToken('demo-admin-jwt-token');
-      setLoginError('');
-      return;
-    }
-    setLoginError('Invalid admin credentials. Demo: admin / Admin@12345');
+
+    // TEMP ADMIN LOGIN FOR TESTING
+    // This AdminPanel login is kept as a fallback (non-working JWT demo),
+    // but for test mode use /admin-login page instead.
+    setLoginError('Use /admin-login with the TEMP credentials.');
   };
 
   const approveDeposit = (id: string) => {

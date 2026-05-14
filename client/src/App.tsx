@@ -11,6 +11,7 @@ import { ABGame } from './components/ABGame';
 import { DevGuide } from './components/DevGuide';
 import { BottomNav } from './components/BottomNav';
 import { AdminPanel } from './components/AdminPanel';
+import { AdminLogin } from './components/AdminLogin';
 
 const AppContent: React.FC = () => {
   const { isLoggedIn, activeTab } = useApp();
@@ -22,7 +23,11 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  if (hash.startsWith('#/admin')) {
+  if (window.location.pathname === '/admin-login' || hash.startsWith('#/admin-login')) {
+    return <AdminLogin />;
+  }
+
+  if (window.location.pathname === '/admin/dashboard' || hash.startsWith('#/admin')) {
     return <AdminPanel />;
   }
 

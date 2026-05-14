@@ -32,7 +32,8 @@ export const AdminLogin: React.FC = () => {
         return;
       }
 
-      localStorage.setItem('daman_admin_token', result.data.token);
+      // TEMP TEST MODE: store admin token in the requested key
+      localStorage.setItem('adminToken', result.data.token);
       navigate('/admin/dashboard');
     } catch (e: any) {
       setError(e?.message || 'Admin login failed');
