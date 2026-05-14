@@ -34,3 +34,15 @@ export const walletWithdrawRequest = async (amount: number) => {
   });
 };
 
+export const walletClaimRequest = async (code: string) => {
+  const token = getToken();
+  if (!token) return { ok: false, status: 401, error: { message: 'Not authenticated' } };
+
+  return apiFetch<{ balance: number; creditedAmount: number; code: string }>(`/wallet/claim`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ code }),
+  });
+};
+
+

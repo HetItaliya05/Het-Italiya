@@ -20,7 +20,6 @@ const toClientUser = (user) => ({
   id: user._id.toString(),
   phone: user.phone,
   uid: user.uid,
-  balance: 0,
   vipLevel: user.vipLevel ?? 1,
 
   totalBets: user.totalBets ?? 0,
@@ -28,6 +27,7 @@ const toClientUser = (user) => ({
   lastCheckIn: user.lastCheckIn ?? null,
   giftCodesUsed: user.giftCodesUsed ?? [],
 });
+
 
 const signToken = (user) => jwt.sign(
   { id: user._id.toString(), role: user.role || 'user' },

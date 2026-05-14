@@ -6,7 +6,9 @@ import { sounds } from '../utils/sound';
 
 
 import { apiFetch } from '../utils/api.ts';
-import { walletAddRequest, walletBalanceRequest, walletWithdrawRequest } from '../apiRequests/wallet';
+import { walletAddRequest, walletBalanceRequest, walletWithdrawRequest, walletClaimRequest } from '../apiRequests/wallet';
+
+
 
 type AuthResult = { success: boolean; message?: string };
 
@@ -32,7 +34,8 @@ interface AppContextType {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   checkIn: () => boolean;
-  claimGiftCode: (code: string) => { success: boolean; message: string; amount?: number };
+  claimGiftCode: (code: string) => Promise<{ success: boolean; message: string; amount?: number }>;
+
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -75,6 +78,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const refreshWalletBalance = async () => {
+
     const token = localStorage.getItem('daman_auth_token');
     if (!token) return;
 
@@ -264,8 +268,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = () => {
     localStorage.removeItem('daman_auth_token');
+    localStorage.removeItem('daman_user');
     setUser(null);
+    setBalance(0);
   };
+
 
   const addBalance = async (amount: number, method: string) => {
     const num = Number(amount);
@@ -369,33 +376,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const claimGiftCode = (code: string): { success: boolean; message: string; amount?: number } => {
+  const claimGiftCode = async (
+    code: string
+  ): Promise<{ success: boolean; message: string; amount?: number }> => {
     if (!user) return { success: false, message: 'Must be logged in' };
+
     const normalized = code.trim().toUpperCase();
+    if (!normalized) return { success: false, message: 'Invalid code' };
 
-    if (user.giftCodesUsed.includes(normalized)) {
+    try {
+      const result = await walletClaimRequest(normalized);
+      if (!result.ok) {
+        sounds.playError();
+        return { success: false, message: result.error?.message || 'Claim failed' };
+      }
+
+      sounds.playSuccess();
+      await refreshWalletBalance();
+
+      const credited = (result as any).data?.creditedAmount;
+      return {
+        success: true,
+        message: `Success! Bonus ₹${credited} added!`,
+        amount: credited,
+      };
+    } catch (e: any) {
+      console.error('claimGiftCode error:', e);
       sounds.playError();
-      return { success: false, message: 'Code already claimed' };
+      return { success: false, message: e?.message || 'Claim failed' };
     }
-
-    let bonus = 0;
-    if (normalized === 'WELCOME100') bonus = 100;
-    else if (normalized === 'DAMAN2026') bonus = 250;
-    else if (normalized === 'VIPBONUS') bonus = 500;
-    else {
-      sounds.playError();
-      return { success: false, message: 'Invalid code' };
-    }
-
-    setUser(u => u ? {
-      ...u,
-      balance: u.balance + bonus,
-      giftCodesUsed: [...u.giftCodesUsed, normalized]
-    } : u);
-
-    sounds.playSuccess();
-    return { success: true, message: `Success! Bonus ₹${bonus} added!`, amount: bonus };
   };
+
 
   return (
     <AppContext.Provider value={{

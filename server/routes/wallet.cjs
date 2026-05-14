@@ -125,5 +125,67 @@ router.post('/withdraw', requireAuth, async (req, res, next) => {
   }
 });
 
+// CLAIM gift / promo code and credit wallet atomically (MongoDB wallet = source of truth)
+router.post('/claim', requireAuth, async (req, res, next) => {
+  const session = await mongoose.startSession();
+
+  try {
+    const userId = req.user?.id;
+    if (!userId) return fail(res, 401, 'Unauthorized');
+
+    const code = String(req.body?.code || '').trim().toUpperCase();
+    if (!code) return fail(res, 400, 'Code is required');
+
+    const promos = {
+      WELCOME100: 100,
+      DAMAN2026: 250,
+      VIPBONUS: 500,
+    };
+
+    const creditedAmount = promos[code];
+    if (!creditedAmount) return fail(res, 400, 'Invalid code');
+
+    const User = require('../models/User.cjs');
+
+    // Use transaction to prevent race conditions / duplicate claims
+    await session.withTransaction(async () => {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: userId, giftCodesUsed: { $ne: code } },
+        { $push: { giftCodesUsed: code } },
+        { new: true, session }
+      );
+
+      if (!updatedUser) {
+        const err = new Error('Code already claimed');
+        err.httpStatus = 409;
+        throw err;
+      }
+
+      const updatedWallet = await Wallet.findOneAndUpdate(
+        { userId },
+        { $inc: { balance: creditedAmount } },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
+          session,
+        }
+      );
+
+      if (!updatedWallet) throw new Error('Wallet update failed');
+    });
+
+    const wallet = await Wallet.findOne({ userId }).lean();
+    return success(res, { balance: wallet?.balance ?? 0, creditedAmount, code });
+  } catch (err) {
+    console.error('POST /wallet/claim error:', err);
+    const status = err?.httpStatus || 500;
+    return res.status(status).json({ success: false, message: err?.message || 'Claim failed' });
+  } finally {
+    session.endSession();
+  }
+});
+
 module.exports = router;
+
 

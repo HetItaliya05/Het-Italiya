@@ -36,14 +36,15 @@ export const Home: React.FC = () => {
     return () => clearInterval(slideInterval);
   }, [banners.length]);
 
-  const handleClaim = (e: React.FormEvent) => {
+  const handleClaim = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!giftInput) return;
-    const res = claimGiftCode(giftInput);
+    const res = await claimGiftCode(giftInput);
     setGiftRes(res);
     setGiftInput('');
     setTimeout(() => setGiftRes(null), 4000);
   };
+
 
   return (
     <div className="flex flex-col flex-1 bg-[#111624] text-gray-200 select-none pb-20">
