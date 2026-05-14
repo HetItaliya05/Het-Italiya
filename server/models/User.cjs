@@ -19,10 +19,12 @@ const userSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    // NOTE: wallet balance is persisted in separate Wallet collection.
     walletBalance: {
       type: Number,
       default: 0,
       min: [0, 'Wallet balance cannot be negative'],
+      select: false,
     },
     vipLevel: {
       type: Number,

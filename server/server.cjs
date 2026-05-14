@@ -233,10 +233,13 @@ app.get("/health", (req, res) => {
 const authRoutes = require("./routes/auth.cjs");
 const adminRoutes = require("./routes/admin.cjs");
 const depositRoutes = require("./routes/deposit.cjs");
+const walletRoutes = require("./routes/wallet.cjs");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", depositRoutes);
+app.use("/api/wallet", walletRoutes);
+
 
 // ================================
 // 404 Route

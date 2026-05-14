@@ -2,7 +2,9 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.cjs');
+const Wallet = require('../models/Wallet.cjs');
 const { requireAuth } = require('../middleware/auth.cjs');
+
 
 const router = express.Router();
 const jwtSecret = process.env.JWT_SECRET;
@@ -18,8 +20,9 @@ const toClientUser = (user) => ({
   id: user._id.toString(),
   phone: user.phone,
   uid: user.uid,
-  balance: user.walletBalance ?? 0,
+  balance: 0,
   vipLevel: user.vipLevel ?? 1,
+
   totalBets: user.totalBets ?? 0,
   checkedInDays: user.checkedInDays ?? 0,
   lastCheckIn: user.lastCheckIn ?? null,
@@ -111,7 +114,18 @@ router.get('/me', requireAuth, async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    return res.json({ user: toClientUser(user) });
+    // Ensure wallet document exists for this user
+    await Wallet.findOneAndUpdate(
+      { userId: req.user.id },
+      { $setOnInsert: { balance: 0 } },
+      { new: true, upsert: true }
+    );
+
+    // Attach wallet balance to the client payload by querying Wallet collection
+    const wallet = await Wallet.findOne({ userId: req.user.id }).lean();
+    const balance = wallet?.balance ?? 0;
+
+    return res.json({ user: { ...toClientUser(user), balance } });
   } catch (error) {
     next(error);
   }

@@ -7,7 +7,9 @@ const User = require('../models/User.cjs');
 const DepositTransaction = require('../models/DepositTransaction.cjs');
 const WithdrawalTransaction = require('../models/WithdrawalTransaction.cjs');
 const GameControl = require('../models/GameControl.cjs');
+const Wallet = require('../models/Wallet.cjs');
 const { requireAuth, requireAdmin } = require('../middleware/auth.cjs');
+
 
 const router = express.Router();
 const jwtSecret = process.env.JWT_SECRET;
@@ -92,14 +94,15 @@ router.get('/users', adminGuard, async (req, res, next) => {
 
 router.patch('/users/:userId', adminGuard, async (req, res, next) => {
   try {
-    const allowed = ['phone', 'walletBalance', 'role'];
+    const allowed = ['phone', 'role'];
     const updates = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
 
-    if (updates.walletBalance !== undefined && Number(updates.walletBalance) < 0) {
-      return res.status(400).json({ message: 'Wallet balance cannot be negative' });
-    }
+    // Wallet balance is managed via Wallet collection APIs.
+    // Intentionally ignore any walletBalance attempts from admin panel.
+
 
     const user = await User.findByIdAndUpdate(req.params.userId, updates, { new: true, runValidators: true });
+
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -122,7 +125,7 @@ router.delete('/users/:userId', adminGuard, async (req, res, next) => {
 
 router.get('/deposits', adminGuard, async (_req, res, next) => {
   try {
-    const deposits = await DepositTransaction.find().populate('userId', 'phone walletBalance').sort({ createdAt: -1 });
+    const deposits = await DepositTransaction.find().populate('userId', 'phone').sort({ createdAt: -1 });
     return res.json({ deposits });
   } catch (error) {
     next(error);
@@ -154,8 +157,14 @@ router.patch('/deposits/:transactionId/:action', adminGuard, async (req, res, ne
       reviewedTransaction = await transaction.save({ session });
 
       if (action === 'approve') {
-        await User.findByIdAndUpdate(transaction.userId, { $inc: { walletBalance: transaction.amount } }, { session });
+        await Wallet.findOneAndUpdate(
+          { userId: transaction.userId },
+          { $inc: { balance: transaction.amount } },
+          { upsert: true, new: true, session, setDefaultsOnInsert: true }
+        );
       }
+
+
     });
 
     return res.json({ transaction: reviewedTransaction });
@@ -168,7 +177,7 @@ router.patch('/deposits/:transactionId/:action', adminGuard, async (req, res, ne
 
 router.get('/withdrawals', adminGuard, async (_req, res, next) => {
   try {
-    const withdrawals = await WithdrawalTransaction.find().populate('userId', 'phone walletBalance').sort({ createdAt: -1 });
+    const withdrawals = await WithdrawalTransaction.find().populate('userId', 'phone').sort({ createdAt: -1 });
     return res.json({ withdrawals });
   } catch (error) {
     next(error);

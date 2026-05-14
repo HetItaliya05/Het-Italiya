@@ -5,9 +5,24 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 const DepositTransaction = require('../models/DepositTransaction.cjs');
 const User = require('../models/User.cjs');
+const Wallet = require('../models/Wallet.cjs');
+
 const { requireAuth, requireAdmin } = require('../middleware/auth.cjs');
 
 const router = express.Router();
+
+const logError = (context, err, extra = {}) => {
+  console.error(`❌ ${context}`, {
+    message: err?.message,
+    stack: err?.stack,
+    ...extra,
+  });
+};
+
+const normalizeAmount = (value) => {
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(num) ? num : null;
+};
 const uploadDir = path.join(__dirname, '..', 'uploads', 'payment-slips');
 
 if (!fs.existsSync(uploadDir)) {
@@ -36,10 +51,10 @@ const upload = multer({
 
 router.post('/deposit', requireAuth, upload.single('screenshot'), async (req, res, next) => {
   try {
-    const amount = Number(req.body.amount);
+    const amount = normalizeAmount(req.body.amount);
     const utr = String(req.body.utr || '').trim().toUpperCase();
 
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
+    if (amount === null || amount <= 0 || amount > 100000) {
       return res.status(400).json({ message: 'Invalid deposit amount' });
     }
 
@@ -103,12 +118,13 @@ router.patch('/admin/deposits/:transactionId/:action', requireAuth, requireAdmin
       reviewedTransaction = await transaction.save({ session });
 
       if (action === 'approve') {
-        await User.findByIdAndUpdate(
-          transaction.userId,
-          { $inc: { walletBalance: transaction.amount } },
-          { session, new: true }
+        await Wallet.findOneAndUpdate(
+          { userId: transaction.userId },
+          { $inc: { balance: transaction.amount } },
+          { session, upsert: true, new: true, setDefaultsOnInsert: true }
         );
       }
+
     });
 
     return res.json({

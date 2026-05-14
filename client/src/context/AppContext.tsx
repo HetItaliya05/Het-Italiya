@@ -6,16 +6,9 @@ import { sounds } from '../utils/sound';
 
 
 import { apiFetch } from '../utils/api.ts';
-
-
-
-
-
-
-
+import { walletAddRequest, walletBalanceRequest, walletWithdrawRequest } from '../apiRequests/wallet';
 
 type AuthResult = { success: boolean; message?: string };
-
 
 interface AppContextType {
   user: User | null;
@@ -24,9 +17,12 @@ interface AppContextType {
   register: (phone: string, password: string) => Promise<AuthResult>;
   logout: () => void;
   balance: number;
-  addBalance: (amount: number, method: string) => void;
-  submitDepositRequest: (amount: number, utr: string, screenshotName: string) => void;
-  withdrawBalance: (amount: number, method: string) => boolean;
+  isWalletLoading: boolean;
+  refreshWalletBalance: () => Promise<void>;
+  addBalance: (amount: number, method: string) => Promise<void>;
+  submitDepositRequest: (amount: number, utr: string, screenshotName: string) => Promise<void>;
+  withdrawBalance: (amount: number, method: string) => Promise<boolean>;
+
   gameHistory: GameHistoryEntry[];
   betsHistory: Bet[];
   transactions: Transaction[];
@@ -47,6 +43,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('daman_user');
     return saved && token ? JSON.parse(saved) : null;
   });
+
+  const [balance, setBalance] = useState<number>(0);
+  const [isWalletLoading, setIsWalletLoading] = useState<boolean>(false);
+
+  // Wallet balance MUST be MongoDB-driven.
+  // Do NOT persist wallet balance in localStorage and do NOT mutate it locally.
 
   const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>(() => {
     const saved = localStorage.getItem('daman_game_history');
@@ -72,6 +74,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentPeriod(createPeriodCode());
   }, []);
 
+  const refreshWalletBalance = async () => {
+    const token = localStorage.getItem('daman_auth_token');
+    if (!token) return;
+
+    // Ensure wallet balance comes from backend only
+    // (prevents refresh/reset due to any old client-only logic)
+
+
+    setIsWalletLoading(true);
+    try {
+      const result = await walletBalanceRequest();
+      if (!result.ok) throw new Error(result.error?.message || 'Failed to fetch wallet balance');
+      setBalance(Number((result as any).data?.balance ?? 0));
+    } catch (e) {
+      console.error('refreshWalletBalance error:', e);
+      setBalance(0);
+    } finally {
+      setIsWalletLoading(false);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('daman_auth_token');
     if (!token) return;
@@ -88,8 +111,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.removeItem('daman_auth_token');
         localStorage.removeItem('daman_user');
         setUser(null);
+        setBalance(0);
+      })
+      .finally(() => {
+        // Always attempt to fetch wallet balance after session validation
+        refreshWalletBalance();
       });
   }, []);
+
 
   // Update localStorage when state changes
   useEffect(() => {
@@ -173,12 +202,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   }
                 }
 
-                if (didWin) {
+          if (didWin) {
                   anyWon = true;
                   const winAmt = bet.amount * multiplier;
-                  if (user) {
-                    setUser(u => u ? { ...u, balance: u.balance + winAmt } : u);
-                  }
+                  // Wallet balance is MongoDB-driven; re-sync after round end (no local wallet mutation)
                   return { ...bet, outcome: 'won', winAmount: winAmt };
                 } else {
                   anyLoss = true;
@@ -223,7 +250,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('daman_auth_token', result.data.token);
     setUser(result.data.user);
     sounds.playSuccess();
+
+    // Fetch wallet balance right after login
+    await refreshWalletBalance();
+
     return { success: true };
+
   };
 
   const login = (phone: string, password: string) => authenticate('login', phone, password);
@@ -235,58 +267,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(null);
   };
 
-  const addBalance = (amount: number, method: string) => {
-    if (!user) return;
-    setUser(u => u ? { ...u, balance: u.balance + amount } : u);
-    setTransactions(prev => [
-      { id: `tx-${Date.now()}`, type: 'deposit', amount, status: 'success', method, timestamp: new Date().toISOString() },
-      ...prev
+  const addBalance = async (amount: number, method: string) => {
+    const num = Number(amount);
+    if (!Number.isFinite(num) || num <= 0) return;
+
+    const result = await walletAddRequest(num);
+    if (!result.ok) {
+      sounds.playError();
+      return;
+
+    }
+
+    setTransactions((prev) => [
+      { id: `tx-${Date.now()}`, type: 'deposit', amount: num, status: 'success', method, timestamp: new Date().toISOString() },
+      ...prev,
     ]);
     sounds.playSuccess();
+    await refreshWalletBalance();
   };
 
-  const submitDepositRequest = (amount: number, utr: string, screenshotName: string) => {
-    if (!user || amount <= 0) return;
+  const submitDepositRequest = async (amount: number, utr: string, screenshotName: string) => {
+    const num = Number(amount);
+    if (!Number.isFinite(num) || num <= 0) return;
+    if (!utr) return;
 
-    setUser(u => u ? { ...u, balance: u.balance + amount } : u);
-    setTransactions(prev => [
+    // Keep existing UI behavior: create a pending/success-like entry locally.
+    // Actual wallet balance is updated by backend admin approval via Wallet model.
+    setTransactions((prev) => [
       {
         id: `tx-${Date.now()}`,
         type: 'deposit',
-        amount,
-        status: 'success',
+        amount: num,
+        status: 'pending',
         method: 'Google Pay UPI Deposit',
         utr,
         screenshotName,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       },
-      ...prev
+      ...prev,
     ]);
+
     sounds.playSuccess();
   };
 
-  const withdrawBalance = (amount: number, method: string): boolean => {
-    if (!user || user.balance < amount) {
+  const withdrawBalance = async (amount: number, method: string): Promise<boolean> => {
+    const num = Number(amount);
+    if (!Number.isFinite(num) || num <= 0) return false;
+
+    const result = await walletWithdrawRequest(num);
+    if (!result.ok) {
       sounds.playError();
       return false;
     }
-    setUser(u => u ? { ...u, balance: u.balance - amount } : u);
-    setTransactions(prev => [
-      { id: `tx-${Date.now()}`, type: 'withdraw', amount, status: 'success', method, timestamp: new Date().toISOString() },
-      ...prev
+
+    setTransactions((prev) => [
+      { id: `tx-${Date.now()}`, type: 'withdraw', amount: num, status: 'success', method, timestamp: new Date().toISOString() },
+      ...prev,
     ]);
     sounds.playSuccess();
+    await refreshWalletBalance();
     return true;
   };
 
   const placeBet = (betOn: string, amount: number): boolean => {
-    if (!user || user.balance < amount) {
+    // Wallet balance is MongoDB-driven; do not mutate/deduct locally.
+    // Prevent betting when backend balance cache is insufficient.
+    if (!user || balance < amount) {
       sounds.playError();
       return false;
     }
-    setUser(u => u ? { ...u, balance: u.balance - amount, totalBets: u.totalBets + amount } : u);
-    
-    // Create bet entry
+
+    // NOTE: existing UI keeps bets client-side; wallet is re-synced after game round end.
+
+    // Create bet entry (wallet balance is MongoDB-driven; do not deduct locally)
     const newBet: Bet = {
       id: `bet-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       period: currentPeriod,
@@ -310,7 +363,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Daily reward amount: 10 * days
     const nextDays = user.checkedInDays + 1;
     const bonus = nextDays * 10;
-    setUser(u => u ? { ...u, checkedInDays: nextDays, lastCheckIn: today, balance: u.balance + bonus } : u);
+    // Wallet balance is MongoDB-driven; do not mutate locally
+    setUser(u => u ? { ...u, checkedInDays: nextDays, lastCheckIn: today } : u);
     sounds.playSuccess();
     return true;
   };
@@ -350,10 +404,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       login,
       register,
       logout,
-      balance: user ? user.balance : 0,
+      balance,
+      isWalletLoading,
+      refreshWalletBalance,
       addBalance,
       submitDepositRequest,
       withdrawBalance,
+
       gameHistory,
       betsHistory,
       transactions,

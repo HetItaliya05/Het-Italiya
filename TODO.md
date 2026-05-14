@@ -1,37 +1,39 @@
-# TODO - MERN Production Refactor
+# TODO - Wallet MongoDB Source of Truth
 
-## Step 1 — Client cleanup
-- [x] Update `client/package.json` to remove backend dependencies.
-- [x] Add `client/.env` and `client/.env.example`.
-- [ ] Ensure all API calls use centralized `apiFetch/apiUrl` correctly.
+## Step 1: Backend wallet routes (wallet.cjs)
+- [ ] Ensure all wallet endpoints validate JWT and amount (no NaN/negative/zero)
+- [ ] Ensure wallet document auto-creates with balance=0 for missing users (upsert)
+- [ ] Ensure consistent JSON response structure for success/failure
+- [ ] Add production-safe error logging for production debugging
 
+## Step 2: Backend admin/deposit integration (deposit.cjs + scan)
+- [ ] Update approved deposit logic to adjust MongoDB Wallet balance only
+- [ ] Ensure no direct User.walletBalance mutations remain
+- [ ] Ensure amount validation + atomic updates where applicable
+- [ ] (If needed) update withdrawal admin flows to adjust Wallet balance correctly
 
-## Step 2 — Server structure hardening
-- [ ] Add `server/config/env.cjs` for env validation.
-- [x] Create `server/.env` and `server/.env.example`.
+## Step 3: Frontend refactor (AppContext + wallet component)
+- [ ] Remove local wallet balance persistence (no localStorage wallet balance)
+- [ ] Remove all local balance mutations (game win, check-in, gift code, placeBet)
+- [ ] Fetch wallet balance immediately after login and after refresh
+- [ ] Re-fetch balance after every add/withdraw transaction
+- [ ] Add spinner UX while fetching balance
 
-- [ ] Add centralized error handling middleware.
-- [ ] Ensure CORS config is correct for Render + Vercel and supports `credentials: true`.
-- [ ] Ensure MongoDB connection is production-ready.
+## Step 4: Environment safety (VITE_API_URL)
+- [ ] Ensure all wallet API calls use VITE_API_URL via apiFetch/apiUrl
+- [ ] Ensure Render CORS allows deployed Vercel origin
 
-## Step 3 — Server startup robustness
-- [ ] Refactor `server/server.cjs` to use config + middleware.
-- [ ] Optimize `server/package.json` scripts for Render.
+## Step 5: Project-wide cleanup
+- [ ] Scan entire project for remaining references:
+  - [ ] `user.walletBalance`
+  - [ ] local wallet balance state/mutations
+  - [ ] mock/demo wallet balance
+  - [ ] hardcoded balance state
+- [ ] Replace with backend-driven Wallet logic
 
-## Step 4 — Deployment-ready configuration
-- [ ] Add/verify `.gitignore`.
-- [ ] Add `.env.example` files for Render/Vercel.
-- [ ] Add/verify root `vercel.json`.
-
-## Step 5 — Verify builds & startup
-- [ ] Run `npm run build` inside `client`.
-- [ ] Run `npm start` inside `server` (with local env placeholders).
-- [ ] Verify auth routes: `/api/auth/register`, `/api/auth/login`, `/api/auth/me`.
-
-## Step 6 — Import/export & API URL consistency
-- [ ] Fix any broken imports.
-- [ ] Fix any remaining route mismatches.
-
-## Done
-- [ ] Update README with deployment steps (Vercel + Render). 
+## Step 6: Testing + deployment notes
+- [ ] Run server/client build or dev tests
+- [ ] Verify refresh does not reset balance to 0
+- [ ] Verify insufficient balance withdraw is blocked
+- [ ] Provide deployment checklist for Render (backend) + Vercel (frontend)
 
