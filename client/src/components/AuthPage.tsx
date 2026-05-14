@@ -126,11 +126,10 @@ export const AuthPage: React.FC = () => {
 
           {/* Visible Admin Login button (required UI element) */}
           <button
-            type="button"
             onClick={() => window.location.assign('/admin-login')}
-            className="w-full py-3 mt-3 bg-[#0f1422] border border-amber-400/40 hover:border-amber-400/70 text-amber-200 font-extrabold rounded-2xl tracking-widest text-sm shadow-lg shadow-amber-500/10 active:scale-98 transition transform uppercase"
+            className="w-full mt-3 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition"
           >
-            Admin Login
+            ADMIN LOGIN
           </button>
         </form>
 
